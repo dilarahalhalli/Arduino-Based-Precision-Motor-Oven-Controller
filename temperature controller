@@ -1,0 +1,82 @@
+#include <LiquidCrystal.h>
+#include <math.h>
+
+// -------- LCD pins --------
+LiquidCrystal lcd(7, 6, 5, 4, 3, 2);
+
+// -------- Sensor pins --------
+const int THERM_PIN = A0;   // CTTS sensor
+const float R_FIXED = 10000.0; // 10k ohm resistor
+const float VREF = 5.0;
+const float ADC_MAX = 1023.0;
+
+// CTTS-203856-S02 parameters
+const float R0 = 10000.0;   // 10k @25°C
+const float B = 3936.0;     // B parameter
+const float T0 = 298.15;    // 25°C in Kelvin
+
+// -------- Potentiometer --------
+const int POT_PIN = A1;
+
+// -------- PTC Enable --------
+const int ENABLE_PIN = 8;
+
+// --- Read voltage from sensor ---
+float readVoltage(int pin) {
+  int raw = analogRead(pin);
+  return (raw / ADC_MAX) * VREF;
+}
+
+// Convert voltage -> Thermistor resistance
+float voltageToRtherm(float V) {
+  if (V <= 0.0 || V >= VREF) return -1;
+  return R_FIXED * (V / (VREF - V));
+}
+
+// Convert resistance -> Temperature (°C)
+float RtoC(float R) {
+  if (R <= 0) return -999;
+  float invT = (1.0 / T0) + (1.0 / B) * log(R / R0);
+  float T = 1.0 / invT;
+  return T - 273.15;
+}
+
+void setup() {
+  pinMode(ENABLE_PIN, OUTPUT);
+  digitalWrite(ENABLE_PIN, LOW); // Initially off
+  lcd.begin(16, 2);
+  lcd.print("Temperature Ctrl");
+  delay(2000);
+}
+
+void loop() {
+  // --- Sensor measurement ---
+  float V = readVoltage(THERM_PIN);
+  float R = voltageToRtherm(V);
+  float tempC = RtoC(R);
+
+  // --- Target temperature ---
+  int potVal = analogRead(POT_PIN);
+  float setpoint = map(potVal, 0, 1023, 20, 100); // Range 20–100°C
+
+  // --- Control ---
+  if (tempC < setpoint - 1) {
+    digitalWrite(ENABLE_PIN, HIGH); // Turn heater on
+  } else if (tempC > setpoint + 1) {
+    digitalWrite(ENABLE_PIN, LOW);  // Turn heater off
+  }
+  
+  // --- Display on LCD ---
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Target:");
+  lcd.print(setpoint, 0);
+  lcd.print("C");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Actual:");
+  lcd.print(tempC, 1);
+  lcd.print("C");
+
+  delay(1000);
+}
