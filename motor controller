@@ -1,34 +1,34 @@
-﻿#include <SoftwareSerial.h>
+#include <SoftwareSerial.h>
 #include <Tic.h>
 #include <LiquidCrystal.h>
 
-// Rotary encoder pinleri
+// Rotary encoder pins
 const int pinCLK = 2;  // Encoder A
 const int pinDT  = 3;  // Encoder B
-volatile int encoderPos = 0;  // Encoder pozisyonu
+volatile int encoderPos = 0;  // Encoder position
 volatile int lastEncoded = 0;
 
 // SoftSerial: Arduino 10=RX, 11=TX
 SoftwareSerial ticSerial(10, 11);  // Arduino 10=RX, 11=TX
-TicSerial tic(ticSerial);          // Tic cihazı
+TicSerial tic(ticSerial);          // Tic device
 
-// LCD pinleri: RS=13, E=12, D4=7, D5=6, D6=5, D7=4
+// LCD pins: RS=13, E=12, D4=7, D5=6, D6=5, D7=4
 LiquidCrystal lcd(13, 12, 7, 6, 5, 4);
 
 void setup() {
-  // Seri haberleşme ve LCD başlatma
+  // Initialize serial communication and LCD
   ticSerial.begin(9600);     
   lcd.begin(16, 2);
 
-  // Enkoder pinleri
+  // Encoder pins
   pinMode(pinCLK, INPUT_PULLUP);
   pinMode(pinDT, INPUT_PULLUP);
 
-  // Interrupt ile enkoder hareketini yakala
+  // Capture encoder movement using interrupts
   attachInterrupt(digitalPinToInterrupt(pinCLK), updateEncoder, CHANGE);
   attachInterrupt(digitalPinToInterrupt(pinDT), updateEncoder, CHANGE);
 
-  // Tic safe start devreden çıkar
+  // Exit Tic safe start mode
   tic.exitSafeStart();
 }
 
@@ -37,23 +37,25 @@ void updateEncoder() {
   int LSB = digitalRead(pinDT);
   int encoded = (MSB << 1) | LSB;
   int sum = (lastEncoded << 2) | encoded;
+
   if (sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011) encoderPos++;
   if (sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000) encoderPos--;
+
   lastEncoded = encoded;
 
-  // Pozisyonu -2000..+2000 aralığında sınırla
+  // Limit position to -2000..+2000
   if (encoderPos > 2000) encoderPos = 2000;
   if (encoderPos < -2000) encoderPos = -2000;
 }
 
 void loop() {
-  // Motoru güncel pozisyona götür
+  // Move motor to current position
   tic.setTargetPosition(encoderPos);
 
-  // LCD ekranın sağ tarafında pozisyonu göster
-  lcd.setCursor(10, 0);         // 1. satır, sağ taraf
-  lcd.print("Motor Loc: ");
-  lcd.print("      ");           // Önce eski değerleri temizle
+  // Display position on the right side of the LCD
+  lcd.setCursor(10, 0);         // Row 1, right side
+  lcd.print("Motor Pos: ");
+  lcd.print("      ");           // Clear previous value
   lcd.setCursor(10, 0);
-  lcd.print(encoderPos);         // Yeni pozisyon yazdır
+  lcd.print(encoderPos);         // Print new position
 }
